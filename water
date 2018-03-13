@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+# /etc/init.d/water
+### BEGIN INIT INFO
+# Provides:			water
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Water the Plants, yo!
+# Description:		Daemon to water to the plants automatically
+### END INIT INFO
+
+import RPi.GPIO as GPIO
+import time
+import datetime
+
+MAX_TIME = 60
+WATER_SENSOR_PIN = 3
+PUMP_RELAY_PIN = 2
+
+def initialize():
+	GPIO.setmode(GPIO.BCM)
+	GPIO.setup(PUMP_RELAY_PIN, GPIO.OUT)
+	GPIO.setup(WATER_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+	GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
+
+cycleTime = 1 # one second per loop
+watering = False
+
+initialize()
+
+try:
+	while True:
+		timeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+		if GPIO.input(WATER_SENSOR_PIN) == GPIO.LOW and watering: # water level sufficient
+			watering = False
+			GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
+			print(timeStr + ': Watering Ended')
+			
+		if GPIO.input(WATER_SENSOR_PIN) == GPIO.HIGH and not watering: # water level level too low
+			watering = True
+			GPIO.output(PUMP_RELAY_PIN, GPIO.LOW)
+			print(timeStr + ': Watering Started')
+		
+		time.sleep(cycleTime)
+
+except KeyboardInterrupt:
+	print " DONE!"
+	GPIO.cleanup()
