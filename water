@@ -20,6 +20,7 @@ PUMP_RELAY_PIN 	 = 2
 CYCLE_TIME 	 = 10 # one second per loop
 
 def initialize():
+	GPIO.setwarnings(False)
 	GPIO.setmode(GPIO.BCM)
 	GPIO.setup(PUMP_RELAY_PIN, GPIO.OUT)
 	GPIO.setup(WATER_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
@@ -40,6 +41,9 @@ def pump(state):
 		GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
 
 
+def water_sensed():
+	return GPIO.input(WATER_SENSOR_PIN) == GPIO.LOW
+
 
 def main():
 	watering  = False
@@ -51,14 +55,14 @@ def main():
 	try:
 		while True:
 			#Soil is sufficiently moist.
-			if GPIO.input(WATER_SENSOR_PIN) == GPIO.LOW and watering: # water level sufficient
+			if water_sensed() and watering: # water level sufficient
 				watering = False
 				pump(False)				
 				startTime = time.time()
 				log("Watering Stopped")
 			
 			# Soil is dry, start AntiDryness procedure
-			if GPIO.input(WATER_SENSOR_PIN) == GPIO.HIGH and not watering and not alarm: # water level level too low
+			if not water_sensed() and not watering and not alarm: # water level level too low
 				watering = True
 				pump(True)
 				log("Watering Started")
@@ -67,7 +71,9 @@ def main():
 			if watering and (time.time() - startTime) > MAX_TIME:
 				alarm = True
 				pump(False)
+				watering = False
 				log("ERR - MAX Watering Time Exceeded. Turning off pump and preventing future waterings")
+				exit()
 				
 
 			time.sleep(CYCLE_TIME)
