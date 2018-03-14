@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Automated Antidryness Device Status</title>
+    <style>
+      #count {
+        font: bold 32px arial;
+        margin: auto;
+        padding: 10px;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    
+    <div id="count"></div>
+    
+    <script>
+      var ws = new WebSocket('ws://10.0.0.44:8080/');
+      ws.onopen = function() {
+        document.body.style.backgroundColor = '#cfc';
+      };
+      ws.onclose = function() {
+        document.body.style.backgroundColor = null;
+      };
+      ws.onmessage = function(event) {
+	var newState = document.createElement("div");
+        newState.appendChild(document.createTextNode(event.data));
+        document.getElementById('count').appendChild(newState);
+      };
+    </script>
+    
+  </body>
+</html>

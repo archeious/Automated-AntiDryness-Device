@@ -14,9 +14,10 @@ import RPi.GPIO as GPIO
 import time
 import datetime
 
-MAX_TIME = 60
+MAX_TIME 	 = 60
 WATER_SENSOR_PIN = 3
-PUMP_RELAY_PIN = 2
+PUMP_RELAY_PIN 	 = 2
+CYCLE_TIME 	 = 10 # one second per loop
 
 def initialize():
 	GPIO.setmode(GPIO.BCM)
@@ -24,26 +25,57 @@ def initialize():
 	GPIO.setup(WATER_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 	GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
 
-cycleTime = 1 # one second per loop
-watering = False
 
-initialize()
+def log( message ):
+	log = open('/var/log/water.log', 'a')
+	timeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+	log.write(timeStr + ': ' + message + '\n')
+	log.close()
 
-try:
-	while True:
-		timeStr = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-		if GPIO.input(WATER_SENSOR_PIN) == GPIO.LOW and watering: # water level sufficient
-			watering = False
-			GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
-			print(timeStr + ': Watering Ended')
+
+def pump(state):
+	if state:
+		GPIO.output(PUMP_RELAY_PIN, GPIO.LOW)
+	else:
+		GPIO.output(PUMP_RELAY_PIN, GPIO.HIGH)
+
+
+
+def main():
+	watering  = False
+	alarm     = False
+	startTime = time.time()
+
+	initialize()
+
+	try:
+		while True:
+			#Soil is sufficiently moist.
+			if GPIO.input(WATER_SENSOR_PIN) == GPIO.LOW and watering: # water level sufficient
+				watering = False
+				pump(False)				
+				startTime = time.time()
+				log("Watering Stopped")
 			
-		if GPIO.input(WATER_SENSOR_PIN) == GPIO.HIGH and not watering: # water level level too low
-			watering = True
-			GPIO.output(PUMP_RELAY_PIN, GPIO.LOW)
-			print(timeStr + ': Watering Started')
-		
-		time.sleep(cycleTime)
+			# Soil is dry, start AntiDryness procedure
+			if GPIO.input(WATER_SENSOR_PIN) == GPIO.HIGH and not watering and not alarm: # water level level too low
+				watering = True
+				pump(True)
+				log("Watering Started")
+			
+			# verify the pump is not creating too much antidryness
+			if watering and (time.time() - startTime) > MAX_TIME:
+				alarm = True
+				pump(False)
+				log("ERR - MAX Watering Time Exceeded. Turning off pump and preventing future waterings")
+				
 
-except KeyboardInterrupt:
-	print " DONE!"
-	GPIO.cleanup()
+			time.sleep(CYCLE_TIME)
+
+	except KeyboardInterrupt:
+		print " DONE!"
+		GPIO.cleanup()
+
+  
+if __name__== "__main__":
+  main()
